@@ -34,7 +34,7 @@
              [results-metadata :as results-metadata]]
             [metabase.sync.analyze.query-results :as qr]
             [metabase.util.schema :as su]
-            [puppetlabs.i18n.core :refer [trs]]
+            [puppetlabs.i18n.core :refer [trs tru]]
             [schema.core :as s]
             [toucan
              [db :as db]
@@ -435,10 +435,9 @@
 ;; TODO - Pretty sure this endpoint is not actually used any more, since Cards are supposed to get archived (via PUT
 ;;        /api/card/:id) instead of deleted.  Should we remove this?
 (api/defendpoint DELETE "/:id"
-  "Delete a `Card`."
+  "Delete a Card. (DEPRECATED -- don't delete a Card anymore -- archive it instead.)"
   [id]
-  (log/warn (str "DELETE /api/card/:id is deprecated. Instead of deleting a Card, "
-                 "you should change its `archived` value via PUT /api/card/:id."))
+  (log/warn (tru "DELETE /api/card/:id is deprecated. Instead, change its `archived` value via PUT /api/card/:id."))
   (let [card (api/write-check Card id)]
     (db/delete! Card :id id)
     (events/publish-event! :card-delete (assoc card :actor_id api/*current-user-id*)))
@@ -556,10 +555,11 @@
                   (u/emoji "💾"))
         ttl-seconds))))
 
-(defn- query-for-card [card parameters constraints]
+(defn- query-for-card [card parameters constraints middleware]
   (let [query (assoc (:dataset_query card)
                 :constraints constraints
-                :parameters  parameters)
+                :parameters  parameters
+                :middleware  middleware)
         ttl   (when (public-settings/enable-query-caching)
                 (or (:cache_ttl card)
                     (query-magic-ttl query)))]
@@ -568,12 +568,12 @@
 (defn run-query-for-card
   "Run the query for Card with PARAMETERS and CONSTRAINTS, and return results in the usual format."
   {:style/indent 1}
-  [card-id & {:keys [parameters constraints context dashboard-id]
+  [card-id & {:keys [parameters constraints context dashboard-id middleware]
               :or   {constraints qp/default-query-constraints
                      context     :question}}]
   {:pre [(u/maybe? sequential? parameters)]}
   (let [card    (api/read-check (Card card-id))
-        query   (query-for-card card parameters constraints)
+        query   (query-for-card card parameters constraints middleware)
         options {:executed-by  api/*current-user-id*
                  :context      context
                  :card-id      card-id
@@ -599,7 +599,8 @@
       (run-query-for-card card-id
         :parameters  (json/parse-string parameters keyword)
         :constraints nil
-        :context     (dataset-api/export-format->context export-format)))))
+        :context     (dataset-api/export-format->context export-format)
+        :middleware  {:skip-results-metadata? true}))))
 
 
 ;;; ----------------------------------------------- Sharing is Caring ------------------------------------------------

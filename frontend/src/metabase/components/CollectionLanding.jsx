@@ -18,7 +18,7 @@ import Modal from "metabase/components/Modal";
 import StackedCheckBox from "metabase/components/StackedCheckBox";
 import EntityItem from "metabase/components/EntityItem";
 import { Grid, GridItem } from "metabase/components/Grid";
-import Icon from "metabase/components/Icon";
+import Icon, { IconWrapper } from "metabase/components/Icon";
 import Link from "metabase/components/Link";
 import EntityMenu from "metabase/components/EntityMenu";
 import VirtualizedList from "metabase/components/VirtualizedList";
@@ -26,12 +26,14 @@ import BrowserCrumbs from "metabase/components/BrowserCrumbs";
 import ItemTypeFilterBar from "metabase/components/ItemTypeFilterBar";
 import CollectionEmptyState from "metabase/components/CollectionEmptyState";
 
+import Tooltip from "metabase/components/Tooltip";
+
 import CollectionMoveModal from "metabase/containers/CollectionMoveModal";
 import { entityObjectLoader } from "metabase/entities/containers/EntityObjectLoader";
 
-import { ROOT_COLLECTION } from "metabase/entities/collections";
-
 import CollectionList from "metabase/components/CollectionList";
+
+import { getUserIsAdmin } from "metabase/selectors/user";
 
 // drag-and-drop components
 import ItemDragSource from "metabase/containers/dnd/ItemDragSource";
@@ -40,50 +42,43 @@ import PinPositionDropTarget from "metabase/containers/dnd/PinPositionDropTarget
 import PinDropTarget from "metabase/containers/dnd/PinDropTarget";
 import ItemsDragLayer from "metabase/containers/dnd/ItemsDragLayer";
 
+import EmptyState from "metabase/components/EmptyState";
+
 const ROW_HEIGHT = 72;
 const PAGE_PADDING = [2, 3, 4];
 
 const ANALYTICS_CONTEXT = "Collection Landing";
 
 const EmptyStateWrapper = ({ children }) => (
-  <Flex
-    align="center"
-    justify="center"
-    p={5}
-    flexDirection="column"
-    w={1}
-    h={"200px"}
-    className="text-medium"
-  >
+  <Box p={5} w={1} h={"200px"}>
     {children}
-  </Flex>
+  </Box>
 );
 
 const DashboardEmptyState = () => (
   <EmptyStateWrapper>
-    <Box>
-      <Icon name="dashboard" size={32} />
-    </Box>
-    <h3>{t`Dashboards let you collect and share data in one place.`}</h3>
+    <EmptyState
+      message={t`Dashboards let you collect and share data in one place.`}
+      illustrationElement={<Icon name="dashboard" size={32} />}
+    />
   </EmptyStateWrapper>
 );
 
 const PulseEmptyState = () => (
   <EmptyStateWrapper>
-    <Box>
-      <Icon name="pulse" size={32} />
-    </Box>
-    <h3
-    >{t`Pulses let you send out the latest data to your team on a schedule via email or slack.`}</h3>
+    <EmptyState
+      message={t`Pulses let you send out the latest data to your team on a schedule via email or slack.`}
+      illustrationElement={<Icon name="pulse" size={32} />}
+    />
   </EmptyStateWrapper>
 );
 
 const QuestionEmptyState = () => (
   <EmptyStateWrapper>
-    <Box>
-      <Icon name="beaker" size={32} />
-    </Box>
-    <h3>{t`Questions are a saved look at your data.`}</h3>
+    <EmptyState
+      message={t`Questions are a saved look at your data.`}
+      illustrationElement={<Icon name="beaker" size={32} />}
+    />
   </EmptyStateWrapper>
 );
 
@@ -112,7 +107,12 @@ import { entityListLoader } from "metabase/entities/containers/EntityListLoader"
   );
   // sort the pinned items by collection_position
   pinned.sort((a, b) => a.collection_position - b.collection_position);
-  return { collections, pinned, unpinned };
+  return {
+    collections,
+    pinned,
+    unpinned,
+    isAdmin: getUserIsAdmin(state),
+  };
 })
 // only apply bulk actions to unpinned items
 @listSelect({
@@ -167,6 +167,7 @@ class DefaultLanding extends React.Component {
       pinned,
       unpinned,
 
+      isAdmin,
       isRoot,
       selected,
       selection,
@@ -185,10 +186,17 @@ class DefaultLanding extends React.Component {
       unpinnedItems = unpinned.filter(u => u.model === location.query.type);
     }
 
-    const collectionIsEmpty = !unpinned.length > 0 && !collections.length > 0;
+    const collectionIsEmpty =
+      !unpinned.length > 0 && !collections.length > 0 && !pinned.length > 0;
     const collectionHasPins = pinned.length > 0;
     const collectionHasItems = unpinned.length > 0;
 
+    const showSidebar =
+      // if the user has write permissions or if there are collections then show the sidebar
+      (collection.can_write || collections.length > 0) &&
+      // there should also be at least one item, otherwise we have a different
+      // new collection CTA
+      !collectionIsEmpty;
     return (
       <Box>
         <Box>
@@ -204,30 +212,56 @@ class DefaultLanding extends React.Component {
                 <BrowserCrumbs
                   analyticsContext={ANALYTICS_CONTEXT}
                   crumbs={[
-                    ...ancestors.map(({ id, name }) => ({
+                    ...ancestors.map(ancestor => ({
                       title: (
-                        <CollectionDropTarget collection={{ id }} margin={8}>
-                          {name}
+                        <CollectionDropTarget collection={ancestor} margin={8}>
+                          {ancestor.name}
                         </CollectionDropTarget>
                       ),
-                      to: Urls.collection(id),
+                      to: Urls.collection(ancestor.id),
                     })),
                   ]}
                 />
               </Box>
-              <h1 style={{ fontWeight: 900 }}>{collection.name}</h1>
+              <Flex align="center">
+                <h1 style={{ fontWeight: 900 }}>{collection.name}</h1>
+                {collection.description && (
+                  <Tooltip tooltip={collection.description}>
+                    <Icon
+                      name="info"
+                      ml={1}
+                      mt="4px"
+                      color={colors["bg-dark"]}
+                      hover={{ color: colors["brand"] }}
+                    />
+                  </Tooltip>
+                )}
+              </Flex>
             </Box>
 
             <Flex ml="auto">
+              {isAdmin &&
+                !collection.personal_owner_id && (
+                  <Tooltip
+                    tooltip={t`Edit the permissions for this collection`}
+                  >
+                    <Link
+                      to={Urls.collectionPermissions(this.props.collectionId)}
+                    >
+                      <IconWrapper>
+                        <Icon name="lock" />
+                      </IconWrapper>
+                    </Link>
+                  </Tooltip>
+                )}
               {collection &&
                 collection.can_write &&
                 !collection.personal_owner_id && (
-                  <Box ml={1}>
-                    <CollectionEditMenu
-                      collectionId={collectionId}
-                      isRoot={isRoot}
-                    />
-                  </Box>
+                  <CollectionEditMenu
+                    collectionId={collectionId}
+                    isAdmin={isAdmin}
+                    isRoot={isRoot}
+                  />
                 )}
               <Box ml={1}>
                 <CollectionBurgerMenu />
@@ -252,7 +286,7 @@ class DefaultLanding extends React.Component {
                           className="relative"
                           key={index}
                         >
-                          <ItemDragSource item={item}>
+                          <ItemDragSource item={item} collection={collection}>
                             <PinnedItem
                               key={`${item.type}:${item.id}`}
                               index={index}
@@ -299,8 +333,8 @@ class DefaultLanding extends React.Component {
               )}
               <Box pt={[1, 2]} px={[2, 4]}>
                 <Grid>
-                  <GridItem w={collectionWidth}>
-                    {!collectionIsEmpty && (
+                  {showSidebar && (
+                    <GridItem w={collectionWidth}>
                       <Box pr={2} className="relative">
                         <Box py={2}>
                           <CollectionSectionHeading>
@@ -315,8 +349,8 @@ class DefaultLanding extends React.Component {
                           w={collectionGridSize}
                         />
                       </Box>
-                    )}
-                  </GridItem>
+                    </GridItem>
+                  )}
                   {collectionHasItems && (
                     <GridItem w={itemWidth}>
                       <Box>
@@ -340,6 +374,7 @@ class DefaultLanding extends React.Component {
                                       <ItemDragSource
                                         item={item}
                                         selection={selection}
+                                        collection={collection}
                                       >
                                         <NormalItem
                                           key={`${item.type}:${item.id}`}
@@ -585,11 +620,8 @@ class CollectionLanding extends React.Component {
     const { object: currentCollection, params: { collectionId } } = this.props;
     const isRoot = collectionId === "root";
 
-    // effective_ancestors doesn't include root collection so add it (unless this is the root collection, of course)
     const ancestors =
-      !isRoot && currentCollection && currentCollection.effective_ancestors
-        ? [ROOT_COLLECTION, ...currentCollection.effective_ancestors]
-        : [];
+      (currentCollection && currentCollection.effective_ancestors) || [];
 
     return (
       <Box>
@@ -617,39 +649,28 @@ const CollectionSectionHeading = ({ children }) => (
   </h5>
 );
 
-const CollectionEditMenu = ({ isRoot, collectionId }) => (
-  <EntityMenu
-    items={[
-      ...(!isRoot
-        ? [
-            {
-              title: t`Edit this collection`,
-              icon: "editdocument",
-              link: `/collection/${collectionId}/edit`,
-              event: `${ANALYTICS_CONTEXT};Edit Menu;Edit Collection Click`,
-            },
-          ]
-        : []),
-      {
-        title: t`Edit permissions`,
-        icon: "lock",
-        link: `/collection/${collectionId}/permissions`,
-        event: `${ANALYTICS_CONTEXT};Edit Menu;Edit Permissions Click`,
-      },
-      ...(!isRoot
-        ? [
-            {
-              title: t`Archive this collection`,
-              icon: "viewArchive",
-              link: `/collection/${collectionId}/archive`,
-              event: `${ANALYTICS_CONTEXT};Edit Menu;Archive Collection`,
-            },
-          ]
-        : []),
-    ]}
-    triggerIcon="pencil"
-  />
-);
+const CollectionEditMenu = ({ isRoot, isAdmin, collectionId }) => {
+  const items = [];
+  if (!isRoot) {
+    items.push({
+      title: t`Edit this collection`,
+      icon: "editdocument",
+      link: `/collection/${collectionId}/edit`,
+      event: `${ANALYTICS_CONTEXT};Edit Menu;Edit Collection Click`,
+    });
+  }
+  if (!isRoot) {
+    items.push({
+      title: t`Archive this collection`,
+      icon: "viewArchive",
+      link: `/collection/${collectionId}/archive`,
+      event: `${ANALYTICS_CONTEXT};Edit Menu;Archive Collection`,
+    });
+  }
+  return items.length > 0 ? (
+    <EntityMenu items={items} triggerIcon="pencil" />
+  ) : null;
+};
 
 const CollectionBurgerMenu = () => (
   <EntityMenu

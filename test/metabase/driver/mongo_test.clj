@@ -2,6 +2,7 @@
   "Tests for Mongo driver."
   (:require [expectations :refer :all]
             [medley.core :as m]
+            [metabase.automagic-dashboards.core :as magic]
             [metabase
              [driver :as driver]
              [query-processor :as qp]
@@ -122,7 +123,7 @@
               :pk?           true}}}
   (driver/describe-table (MongoDriver.) (data/db) (Table (data/id :venues))))
 
-;; Make sure that all-NULL columns work are synced correctly (#6875)
+;; Make sure that all-NULL columns work and are synced correctly (#6875)
 (i/def-database-definition ^:private all-null-columns
   [["bird_species"
      [{:field-name "name", :base-type :type/Text}
@@ -267,3 +268,12 @@
 (expect
   nil
   (#'mongo/most-common-object-type [[Float 20] [nil 40] [Integer 10] [String 30]]))
+
+
+;; make sure x-rays don't use features that the driver doesn't support
+(datasets/expect-with-engine :mongo
+  true
+  (->> (magic/automagic-analysis (Field (data/id :venues :price)) {})
+       :ordered_cards
+       (mapcat (comp :breakout :query :dataset_query :card))
+       (not-any? #{[:binning-strategy [:field-id (data/id :venues :price)] "default"]})))

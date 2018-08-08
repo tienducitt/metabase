@@ -35,7 +35,7 @@ export default class ProfileLink extends Component {
   };
 
   generateOptionsForUser = () => {
-    const { tag } = this.props;
+    const { tag } = MetabaseSettings.get("version");
     const admin = this.props.user.is_superuser;
     const adminContext = this.props.context === "admin";
     return [
@@ -66,7 +66,10 @@ export default class ProfileLink extends Component {
       {
         title: t`Help`,
         icon: null,
-        link: `https://metabase.com/docs/${tag}`,
+        // HACK - for some reason if you use // react router treats the link
+        // as a non local route
+        link: `//metabase.com/docs/${tag}`,
+        externalLink: true,
         event: `Navbar;Profile Dropdown;About ${tag}`,
       },
       {
@@ -89,7 +92,11 @@ export default class ProfileLink extends Component {
     const { tag, date, ...versionExtra } = MetabaseSettings.get("version");
     return (
       <Box>
-        <EntityMenu items={this.generateOptionsForUser()} triggerIcon="gear" />
+        <EntityMenu
+          tooltip={t`Settings`}
+          items={this.generateOptionsForUser()}
+          triggerIcon="gear"
+        />
         {modalOpen === "about" ? (
           <Modal small onClose={this.closeModal}>
             <div className="px4 pt4 pb2 text-centered relative">
