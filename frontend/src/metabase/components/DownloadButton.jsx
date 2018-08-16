@@ -33,6 +33,7 @@ const DownloadButton = ({
     <form method={method} action={url}>
       {params && extractQueryParams(params).map(getInput)}
       <Flex
+        is="button"
         className="text-brand-hover cursor-pointer"
         align="center"
         onClick={e => {
