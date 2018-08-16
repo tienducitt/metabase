@@ -2,17 +2,11 @@ import React from "react";
 import PropTypes from "prop-types";
 import { Box, Flex } from "grid-styled";
 
-import { Absolute } from "metabase/components/Position";
-
 import colors from "metabase/lib/colors";
 import { extractQueryParams } from "metabase/lib/urls";
 
 import Icon from "metabase/components/Icon";
 import Text from "metabase/components/Text";
-
-function iconForType(type) {
-  return "document";
-}
 
 function colorForType(type) {
   switch (type) {
@@ -51,12 +45,7 @@ const DownloadButton = ({
         }}
         {...props}
       >
-        <Icon
-          name={iconForType(children)}
-          size={32}
-          mr={1}
-          color={colorForType(children)}
-        />
+        <Icon name={children} size={32} mr={1} color={colorForType(children)} />
         <Text>.{children}</Text>
       </Flex>
     </form>
