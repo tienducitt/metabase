@@ -1516,9 +1516,9 @@ databaseChangeLog:
             tableName: revision
             indexName: idx_revision_model_model_id
             columns:
-              column:
+              - column:
                 name: model
-              column:
+              - column:
                 name: model_id
         - modifySql:
             dbms: postgresql
@@ -2990,9 +2990,9 @@ databaseChangeLog:
             tableName: permissions_group_membership
             indexName: idx_permissions_group_membership_group_id_user_id
             columns:
-              column:
+              - column:
                 name: group_id
-              column:
+              - column:
                 name: user_id
         ############################################################ add Permissions table ############################################################
         - createTable:
@@ -3033,9 +3033,9 @@ databaseChangeLog:
             tableName: permissions
             indexName: idx_permissions_group_id_object
             columns:
-              column:
+              - column:
                 name: group_id
-              column:
+              - column:
                 name: object
         - addUniqueConstraint:
             tableName: permissions
@@ -3058,9 +3058,9 @@ databaseChangeLog:
             tableName: metabase_table
             indexName: idx_metabase_table_db_id_schema
             columns:
-              column:
+              - column:
                 name: db_id
-              column:
+              - column:
                 name: schema
   - changeSet:
       id: 41
@@ -3516,10 +3516,10 @@ databaseChangeLog:
             tableName: query_execution
             indexName: idx_query_execution_query_hash_started_at
             columns:
-              column:
-                name: query_hash
-              column:
-                name: started_at
+              - column:
+                  name: hash
+              - column:
+                  name: started_at
   - property:
         name: blob.type
         value: blob
